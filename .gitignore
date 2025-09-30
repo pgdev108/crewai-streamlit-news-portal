@@ -1,0 +1,50 @@
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+
+# --- Python / build ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.dist/
+build/
+.eggs/
+
+# --- Virtual envs ---
+.venv/
+venv/
+ENV/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.code-workspace
+
+# --- Project artifacts ---
+# secrets & local config
+.env
+.env.local
+.streamlit/secrets.toml
+
+# runtime data
+memory/
+output/
+back-up/
+
+# caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+
+# --- uv ---
+# Keep uv.lock committed (important for reproducible builds)
+# uv.lock
+
+# --- logs & temps ---
+*.log
+*.tmp
+*.swp
+*.swo

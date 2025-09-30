@@ -1,0 +1,92 @@
+pick_sub_topics_task:
+  description: |
+    Given the main topic: "{topic}"
+
+    Produce EXACTLY 2 distinct sub-topics (not overlapping).
+    Prefer sub-topics that are active in current news cycles.
+
+    Return STRICT JSON with this schema:
+    {
+      "subtopics": ["...", "...", "...", "...", "..."]
+    }
+  agent: sub_topics_picker_agent
+  expected_output: |
+    {
+      "subtopics": ["subtopic1","subtopic2","subtopic3","subtopic4","subtopic5"]
+    }
+  output_file: "./output/step1_subtopics.json"
+
+pick_news_articles_task:
+  description: |
+    You are given 2 sub-topics previously chosen for "{topic}".
+    For each sub-topic, use the Serper Google Search tool to find:
+      - 2 latest news articles (NOT editorials) with title, url, source/publisher, published_date (ISO if available).
+      - 1 editorial/opinion piece (clearly marked) with same fields and "is_editorial": true.
+
+    Return STRICT JSON:
+    {
+      "per_subtopic": {
+        "<subtopic>": {
+          "candidates": [
+            {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD", "is_editorial": false},
+            ...
+          ],
+          "editorial_candidates": [
+            {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD", "is_editorial": true}
+          ]
+        },
+        ...
+      }
+    }
+
+    Rules:
+      - Prefer the last 14 days if possible.
+      - Avoid duplicates & dead links.
+      - If published_date not visible, set it to null.
+  agent: news_article_picker_agent
+  expected_output: |
+    {
+      "per_subtopic": {
+        "subtopic1": { "candidates": [...], "editorial_candidates": [...] },
+        ...
+      }
+    }
+  output_file: "./output/step2_candidates.json"
+  context: [pick_sub_topics_task]
+
+research_and_select_best_task:
+  description: |
+    You are given: sub-topics and, for each, candidates + editorials.
+    Select:
+      - Exactly 1 best news article per sub-topic ("best_article")
+      - Exactly 1 best editorial across ALL sub-topics ("best_editorial")
+
+    Selection criteria (in order):
+      1) Credibility of source; 2) Freshness (newer = better);
+      3) Relevance to sub-topic; 4) Depth/insight.
+
+    Return STRICT JSON with this shape:
+    {
+      "final": {
+        "subtopics": ["...", "...", "...", "...", "..."],
+        "per_subtopic": {
+          "<subtopic>": {
+            "candidates": [...],
+            "editorial_candidates": [...],
+            "best_article": {"title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD","is_editorial": false}
+          },
+          ...
+        },
+        "home": {
+          "best_articles": [
+            {"subtopic":"<subtopic>", "title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD"}
+          ],
+          "best_editorial": {"subtopic":"<subtopic_of_editorial>","title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD"}
+        }
+      }
+    }
+  agent: news_article_researcher_agent
+  expected_output: |
+    { "final": { "subtopics": [...], "per_subtopic": {...}, "home": {...} } }
+  output_file: "./output/step3_final.json"
+  context: [pick_sub_topics_task, pick_news_articles_task]
