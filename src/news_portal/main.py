@@ -109,8 +109,8 @@ if results:
         st.markdown("### Sections")
         if st.button("Home", use_container_width=True):
             st.session_state["active_menu"] = "Home"
-        # Show exactly 5 subtopics as buttons
-        for stp in subtopics[:5]:
+        # Show exactly 2 subtopics as buttons
+        for stp in subtopics[:2]:
             if st.button(stp, use_container_width=True):
                 st.session_state["active_menu"] = stp
 

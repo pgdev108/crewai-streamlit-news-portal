@@ -39,8 +39,8 @@ def ensure_json(s: str) -> Dict[str, Any]:
 class NewsPortalCrew:
     """ News Portal Crew """
 
-    agents_config = "agents.yaml"
-    tasks_config = "tasks.yaml"
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"
 
     # Agents
     @agent
