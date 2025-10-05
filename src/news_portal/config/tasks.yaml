@@ -1,92 +1,305 @@
-pick_sub_topics_task:
+# --- Shared constants (fixed topic & sub-topics) ---
+# Sub-topic names are used by the UI. Descriptions guide search/summaries/editorials.
+# 1) Cancer Research & Prevention
+# 2) Early Detection and Diagnosis
+# 3) Cancer Drug Discovery and Development
+# 4) Cancer Treatment Methods
+# 5) Precision Oncology
+
+pick_news_crp:
   description: |
-    Given the main topic: "{topic}"
+    Sub-topic: "Cancer Research & Prevention"
+    Guidance (broad, not limited to AI):
+      - Prevention strategies (screening programs, lifestyle, vaccines), population health, risk factors,
+        epidemiology, public health policy, funding, major studies, meta-analyses, guidelines.
+      - Include credible news on breakthroughs, controversies, real-world outcomes, or major institutional updates.
+    Use the Serper (Google) tool to find EXACTLY 5 recent credible news articles.
 
-    Produce EXACTLY 2 distinct sub-topics (not overlapping).
-    Prefer sub-topics that are active in current news cycles.
-
-    Return STRICT JSON with this schema:
-    {
-      "subtopics": ["...", "...", "...", "...", "..."]
-    }
-  agent: sub_topics_picker_agent
-  expected_output: |
-    {
-      "subtopics": ["subtopic1","subtopic2","subtopic3","subtopic4","subtopic5"]
-    }
-  output_file: "./output/step1_subtopics.json"
-
-pick_news_articles_task:
-  description: |
-    You are given 2 sub-topics previously chosen for "{topic}".
-    For each sub-topic, use the Serper Google Search tool to find:
-      - 2 latest news articles (NOT editorials) with title, url, source/publisher, published_date (ISO if available).
-      - 1 editorial/opinion piece (clearly marked) with same fields and "is_editorial": true.
+    Retrieval strategy (bounded, multi-pass):
+      PASS 1 (Fresh): last ~21 days; 2–3 query variants (e.g., ["cancer prevention news", "cancer risks epidemiology", "screening guidelines cancer"]).
+      PASS 2 (Extend): last ~60 days; 2–3 new variants; ask for 10–20 results.
+      PASS 3 (Broaden): include reputable institutional and society sources (NCI/NIH, WHO, major cancer centers, ASCO/ESMO).
+      Always deduplicate by title+URL and avoid dead links. Prefer credible outlets. If the published date is not visible, set it to null.
 
     Return STRICT JSON:
     {
-      "per_subtopic": {
-        "<subtopic>": {
-          "candidates": [
-            {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD", "is_editorial": false},
-            ...
-          ],
-          "editorial_candidates": [
-            {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD", "is_editorial": true}
-          ]
-        },
-        ...
-      }
-    }
-
-    Rules:
-      - Prefer the last 14 days if possible.
-      - Avoid duplicates & dead links.
-      - If published_date not visible, set it to null.
-  agent: news_article_picker_agent
+      "subtopic": "Cancer Research & Prevention",
+       "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  agent: news_picker_agent
   expected_output: |
-    {
-      "per_subtopic": {
-        "subtopic1": { "candidates": [...], "editorial_candidates": [...] },
-        ...
-      }
-    }
-  output_file: "./output/step2_candidates.json"
-  context: [pick_sub_topics_task]
+    { "subtopic": "Cancer Research & Prevention", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  output_file: "./output/step1_crp_news.json"
 
-research_and_select_best_task:
+pick_news_edd:
   description: |
-    You are given: sub-topics and, for each, candidates + editorials.
-    Select:
-      - Exactly 1 best news article per sub-topic ("best_article")
-      - Exactly 1 best editorial across ALL sub-topics ("best_editorial")
+    Sub-topic: "Early Detection and Diagnosis"
+    Guidance (broad, not limited to AI):
+      - Imaging (CT/MRI/PET/mammography), pathology, biomarkers/liquid biopsy, screening programs, risk scoring,
+        guideline changes, trial readouts, real-world performance, access/coverage issues.
+    Use the Serper (Google) tool to find EXACTLY 5 recent credible news articles.
+    Retrieval strategy: 21→60 days multi-pass as above; examples: ["early cancer detection news", "cancer diagnosis biomarkers", "screening cancer policy"].
+    Deduplicate by title+URL; avoid dead links; set published_date to null if unknown.
 
-    Selection criteria (in order):
-      1) Credibility of source; 2) Freshness (newer = better);
-      3) Relevance to sub-topic; 4) Depth/insight.
+    Return STRICT JSON:
+    { "subtopic":"Early Detection and Diagnosis", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  agent: news_picker_agent
+  expected_output: |
+    { "subtopic":"Early Detection and Diagnosis", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  output_file: "./output/step1_edd_news.json"
 
-    Return STRICT JSON with this shape:
+pick_news_cddd:
+  description: |
+    Sub-topic: "Cancer Drug Discovery and Development"
+    Guidance (broad, not limited to AI):
+      - Target discovery, preclinical findings, INDs, trial initiations/halts, interim/primary results, FDA/EMA decisions,
+        partnerships/M&A, funding, platform/method advances, manufacturing/supply updates.
+    Use the Serper (Google) tool to find EXACTLY 5 recent credible news articles.
+    Retrieval strategy: 21→60 days multi-pass; examples: ["oncology drug development news", "cancer trial results", "FDA cancer approval"].
+    Deduplicate by title+URL; avoid dead links; set published_date to null if unknown.
+
+    Return STRICT JSON:
+    { "subtopic":"Cancer Drug Discovery and Development", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  agent: news_picker_agent
+  expected_output: |
+    { "subtopic":"Cancer Drug Discovery and Development", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  output_file: "./output/step1_cddd_news.json"
+
+pick_news_ctm:
+  description: |
+    Sub-topic: "Cancer Treatment Methods"
+    Guidance (broad, not limited to AI):
+      - Surgery, radiation, systemic therapies (chemo, immunotherapy, targeted, cellular), regimen updates,
+        supportive care, toxicity management, guideline changes, cost/access, disparities, outcomes.
+    Use the Serper (Google) tool to find EXACTLY 5 recent credible news articles.
+    Retrieval strategy: 21→60 days multi-pass; examples: ["cancer treatment news", "immunotherapy update", "chemotherapy regimen study"].
+    Deduplicate by title+URL; avoid dead links; set published_date to null if unknown.
+
+    Return STRICT JSON:
+    { "subtopic":"Cancer Treatment Methods", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  agent: news_picker_agent
+  expected_output: |
+    { "subtopic":"Cancer Treatment Methods", "articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"},
+            ... 5 items ... ] }
+  output_file: "./output/step1_ctm_news.json"
+
+pick_news_po:
+  description: |
+    Sub-topic: "Precision Oncology"
+    Guidance (broad, not limited to AI):
+      - Genomic/epigenomic/transcriptomic profiling, biomarker-driven therapy, companion diagnostics, tumor boards,
+        real-world evidence, access/reimbursement, regulatory updates, cross-trial syntheses.
+    Use the Serper (Google) tool to find EXACTLY 5 recent credible news articles.
+    Retrieval strategy: 21→60 days multi-pass; examples: ["precision oncology news", "biomarker cancer treatment", "companion diagnostic approval"].
+    Deduplicate by title+URL; avoid dead links; set published_date to null if unknown.
+
+    Return STRICT JSON:
+    { "subtopic":"Precision Oncology","articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  agent: news_picker_agent
+  expected_output: |
+    { "subtopic":"Precision Oncology","articles":[ {"title":"...", "url":"...", "source":"...", "published_date":"YYYY-MM-DD"  },... 5 items ... ] }
+  output_file: "./output/step1_po_news.json"
+
+# --- Editor tasks: per sub-topic, add summaries + sub-topic editorial ---
+edit_crp:
+  description: |
+    Given 5 articles for "Cancer Research & Prevention", produce:
+      - "summaries": a 2–3 sentence summary (40–80 words) for each article, in the same order.
+      - "editorial": a concise synthesis (150–250 words) integrating the five articles without repeating titles.
+    If an article field is missing, leave its summary as null and continue.
+    Return STRICT JSON:
+    {
+      "subtopic":"Cancer Research & Prevention",
+      "summaries":[ "summary for article 1", "...", "summary for article 5" ],
+      "editorial":"..."
+    }
+  agent: editor_agent
+  context: [pick_news_crp]
+  expected_output: |
+    { "subtopic":"Cancer Research & Prevention", "summaries":[...5...], "editorial":"..." }
+  output_file: "./output/step2_crp_editor.json"
+
+edit_edd:
+  description: |    
+    Given 5 articles for "Early Detection and Diagnosis", produce:
+      - "summaries": a 2–3 sentence summary (40–80 words) for each article, in the same order.
+      - "editorial": a concise synthesis (150–250 words) integrating the five articles without repeating titles.
+    If an article field is missing, leave its summary as null and continue.
+    Return STRICT JSON:
+    { "subtopic":"Early Detection and Diagnosis", "summaries":[...5...], "editorial":"..." }
+  agent: editor_agent
+  context: [pick_news_edd]
+  expected_output: |
+    { "subtopic":"Early Detection and Diagnosis", "summaries":[...5...], "editorial":"..." }
+  output_file: "./output/step2_edd_editor.json"
+
+edit_cddd:
+  description: |    
+    Given 5 articles for "Cancer Drug Discovery and Development", produce:
+      - "summaries": a 2–3 sentence summary (40–80 words) for each article, in the same order.
+      - "editorial": a concise synthesis (150–250 words) integrating the five articles without repeating titles.
+    If an article field is missing, leave its summary as null and continue.
+    Return STRICT JSON:
+    { "subtopic":"Cancer Drug Discovery and Development", "summaries":[...5...], "editorial":"..." }
+  agent: editor_agent
+  context: [pick_news_cddd]
+  expected_output: |
+    { "subtopic":"Cancer Drug Discovery and Development", "summaries":[...5...], "editorial":"..." }
+  output_file: "./output/step2_cddd_editor.json"
+
+edit_ctm:
+  description: |    
+    Given 5 articles for "Cancer Treatment Methods", produce:
+      - "summaries": a 2–3 sentence summary (40–80 words) for each article, in the same order.
+      - "editorial": a concise synthesis (150–250 words) integrating the five articles without repeating titles.
+    If an article field is missing, leave its summary as null and continue.
+    Return STRICT JSON:
+    { "subtopic":"Cancer Treatment Methods", "summaries":[...5...], "editorial":"..." }
+  agent: editor_agent
+  context: [pick_news_ctm]
+  expected_output: |
+    { "subtopic":"Cancer Treatment Methods", "summaries":[...5...], "editorial":"..." }
+  output_file: "./output/step2_ctm_editor.json"
+
+edit_po:
+  description: |    
+    Given 5 articles for "Precision Oncology", produce:
+      - "summaries": a 2–3 sentence summary (40–80 words) for each article, in the same order.
+      - "editorial": a concise synthesis (150–250 words) integrating the five articles without repeating titles.
+    If an article field is missing, leave its summary as null and continue.
+    Return STRICT JSON:
+    { "subtopic":"Precision Oncology", "summaries":[...5...], "editorial":"..." }
+  agent: editor_agent
+  context: [pick_news_po]
+  expected_output: |
+    { "subtopic":"Precision Oncology", "summaries":[...5...], "editorial":"..." }
+  output_file: "./output/step2_po_editor.json"
+
+# --- Chief editor: pick best articles + main editorial ---
+chief_editor:
+  description: |
+    You receive the five sub-topic news sets and editor packages.
+    Do the following WITHOUT delegating or requesting revisions:
+      1) Select the single best news article for each sub-topic (credibility, recency, relevance, clarity).
+      2) Create one MAIN EDITORIAL (250–400 words) synthesizing all five sub-topic editorials.
+         If any sub-topic editorial seems weak or a summary is missing, proceed anyway and add
+         "needs_followup": true with a brief "note" inside the "final" object.
+    Output STRICT JSON (this is the final shape for the UI):
     {
       "final": {
-        "subtopics": ["...", "...", "...", "...", "..."],
+        "topic": "Cancer Health Care",
+        "subtopics": [
+          "Cancer Research & Prevention",
+          "Early Detection and Diagnosis",
+          "Cancer Drug Discovery and Development",
+          "Cancer Treatment Methods",
+          "Precision Oncology"
+        ],
         "per_subtopic": {
           "<subtopic>": {
-            "candidates": [...],
-            "editorial_candidates": [...],
-            "best_article": {"title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD","is_editorial": false}
-          },
-          ...
+            "articles": [
+              {"title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD","summary":"..."}
+            ],
+            "editorial": "...",
+            "best_article": {"title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD","summary":"..."}
+          }
         },
         "home": {
           "best_articles": [
-            {"subtopic":"<subtopic>", "title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD"}
+            {"subtopic":"<subtopic>","title":"...","url":"...","published_date":"YYYY-MM-DD","summary":"..."}
           ],
-          "best_editorial": {"subtopic":"<subtopic_of_editorial>","title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD"}
+          "main_editorial": "..."
         }
       }
     }
-  agent: news_article_researcher_agent
+  agent: chief_editor_agent
+  context:
+    - pick_news_crp
+    - pick_news_edd
+    - pick_news_cddd
+    - pick_news_ctm
+    - pick_news_po
+    - edit_crp
+    - edit_edd
+    - edit_cddd
+    - edit_ctm
+    - edit_po
   expected_output: |
-    { "final": { "subtopics": [...], "per_subtopic": {...}, "home": {...} } }
-  output_file: "./output/step3_final.json"
-  context: [pick_sub_topics_task, pick_news_articles_task]
+    { "final": { "topic":"Cancer Health Care", "subtopics":[...5...], "per_subtopic":{...}, "home":{...} } }
+  output_file: "./output/step3_chief_editor.json"
+
+# --- QA task ---
+qa_task:
+  description: |
+    Validate the entire final structure ONLY (read-only for this task).
+    Checks:
+      - For each sub-topic: exactly 5 "articles" with title, url, source, published_date (or null).
+      - Each "summary" must exist and be 2–3 sentences. Treat a sentence as text ending with . ! or ?  (simple heuristic).
+      - Non-empty "editorial" per sub-topic.
+      - A "best_article" for each sub-topic.
+      - "home.best_articles" has 5 entries and "home.main_editorial" exists (non-empty preferred).
+    Output:
+      - Return STRICT JSON with SAME "final" object (pass-through), plus a "validation" object:
+        { "final": { ... }, "validation": { "status": "ok" | "needs_followup", "issues": [ ... ],
+          "repairs": { "missing_articles": {"<subtopic>": <count_missing>, ...},
+                       "bad_summaries": [{"subtopic":"...", "index": <0-4>, "reason":"<too_short|too_long|missing>"}] } } }    
+    Do NOT attempt to re-run searches or request edits.
+  agent: qa_agent
+  context: [chief_editor]
+  expected_output: |
+    { "final": { ... }, "validation": { "status": "ok" | "needs_followup", "issues": [ ... ] } }
+  output_file: "./output/step4_qa_final.json"
+
+qa_remediate:
+  description: |
+    Using the previous QA validation (context), perform ONE remediation pass with bounded delegation.
+    Goals (strict caps):
+      1) For any sub-topic with <5 articles, request the News Picker to fetch ONLY the number of additional
+         articles needed to reach 5 (prefer last 180 days; deduplicate by title+URL; avoid dead links).
+      2) For each added article (and any existing article missing/invalid summary), request the Editor to
+         produce a 2–3 sentence summary (40–80 words). The Editor may use the scraper tool.
+    Constraints:
+      - Single remediation round only. Do not re-run validation inside this task.
+      - Only append missing items and add/replace summaries as needed; do not touch healthy items.
+    Return STRICT JSON:
+    {
+      "patched": {
+        "per_subtopic": {
+          "<subtopic>": {
+            "added_articles": [
+              {"title":"...","url":"...","source":"...","published_date":"YYYY-MM-DD","summary":"..."}
+            ],
+            "fixed_summaries": [{"index": 0, "summary": "..."}]
+          }
+        }
+      }
+    }
+  agent: qa_agent   # allow_delegation: true in agents.yaml
+  context: [qa_task]
+  expected_output: |
+    { "patched": { "per_subtopic": { ... } } }
+  output_file: "./output/step5_qa_remediate.json"
+
+
+rebuild_final:
+  description: |
+    Merge QA remediation patches into the previous FINAL JSON. For each sub-topic:
+      - Append "added_articles" (if any) to reach exactly 5, maintaining deduplication.
+      - Apply "fixed_summaries" by index.
+      - Recompute "best_article" if new items were added.
+    Update "home.best_articles" accordingly. Do not rewrite editorials.
+    Return STRICT JSON: { "final": { ... } }
+  agent: chief_editor_agent
+  context: [chief_editor, qa_task, qa_remediate]
+  expected_output: |
+    { "final": { ... } }
+  output_file: "./output/step6_rebuild_final.json"
+
+qa_task_final:
+  description: |
+    Final validation using the same checks (5 articles per sub-topic; summary 2–3 sentences; etc.).
+    Return STRICT JSON: { "final": { ... }, "validation": { "status": "ok" | "needs_followup", "issues": [ ... ] } }
+  agent: qa_agent
+  context: [rebuild_final]
+  expected_output: |
+    { "final": { ... }, "validation": { "status": "ok" | "needs_followup", "issues": [ ... ] } }
+  output_file: "./output/step7_qa_final.json"

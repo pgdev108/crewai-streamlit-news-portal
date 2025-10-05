@@ -1,127 +1,143 @@
-import os
-import json
-from pathlib import Path
+import traceback
 import streamlit as st
-from dotenv import load_dotenv
-
 from crew import NewsPortalCrew
 
-load_dotenv()
-st.set_page_config(page_title="AI News Portal", layout="wide")
+st.set_page_config(page_title="Cancer Health Care News Portal", layout="wide")
+st.title("🧬 Cancer Health Care News Portal")
 
-# --- Topics dropdown ---
-DEFAULT_TOPICS = [
-    "Cancer Health Research",
-    "Obesity Research",
-    "Cardiovascular Health",
-    "Neuroscience",
-    "Diabetes & Metabolism",
-    "Climate & Health",
+SUBTOPICS = [
+    "Cancer Research & Prevention",
+    "Early Detection and Diagnosis",
+    "Cancer Drug Discovery and Development",
+    "Cancer Treatment Methods",
+    "Precision Oncology",
 ]
 
-st.title("📰 AI News Portal (CrewAI + Streamlit)")
-topic = st.selectbox("Choose a topic:", DEFAULT_TOPICS, index=0)
-
-# Run button
-run_clicked = st.button("Run Agents", type="primary")
-
-# Placeholder for layout
-left, right = st.columns([1, 3])
-
-# Session state to hold results
+# ---- Session State ----
 if "results" not in st.session_state:
     st.session_state["results"] = None
+if "error" not in st.session_state:
+    st.session_state["error"] = None
 if "active_menu" not in st.session_state:
     st.session_state["active_menu"] = "Home"
+if "running" not in st.session_state:
+    st.session_state["running"] = False
+
+# ---- Helpers to render ----
+def card_article(a: dict):
+    st.markdown(
+        f"**{a.get('title','(title)')}**  \n"
+        f"[Open Link]({a.get('url','')})  \n"
+        f"*Published:* {a.get('published_date','?')}  \n\n"
+        f"{a.get('summary','(no summary)')}"
+    )
 
 def render_home(final):
-    st.subheader("🏠 Home: Best Articles & Editorial")
+    st.subheader("🏠 Home")
     home = final.get("home", {})
     best_articles = home.get("best_articles", [])
-    best_editorial = home.get("best_editorial")
-
-    st.markdown("### Top News (per sub-topic)")
+    main_editorial = home.get("main_editorial", "")
+    st.markdown("### Featured Articles (Best per Sub-topic)")
     for a in best_articles:
         with st.container(border=True):
-            st.markdown(f"**{a.get('title','(title)')}**  \n"
-                        f"[Open Link]({a.get('url','')})  \n"
-                        f"*{a.get('source','?')}*  |  {a.get('published_date','')}")
+            card_article(a)
     st.markdown("---")
-    st.markdown("### Best Editorial (overall)")
-    if best_editorial:
-        with st.container(border=True):
-            st.markdown(f"**{best_editorial.get('title','(title)')}**  \n"
-                        f"[Open Link]({best_editorial.get('url','')})  \n"
-                        f"*{best_editorial.get('source','?')}*  |  {best_editorial.get('published_date','')}")
+    st.markdown("### Main Editorial")
+    if main_editorial:
+        st.write(main_editorial)
     else:
-        st.info("No editorial selected yet.")
+        st.info("Main editorial not available.")
 
 def render_subtopic(final, subtopic):
     st.subheader(f"📚 {subtopic}")
     ps = final.get("per_subtopic", {}).get(subtopic, {})
-    cands = ps.get("candidates", [])
-    eds = ps.get("editorial_candidates", [])
-    best = ps.get("best_article")
-
-    st.markdown("#### Best Article")
-    if best:
-        with st.container(border=True):
-            st.markdown(f"**{best.get('title','(title)')}**  \n"
-                        f"[Open Link]({best.get('url','')})  \n"
-                        f"*{best.get('source','?')}*  |  {best.get('published_date','')}")
+    st.markdown("#### Editorial")
+    editorial = ps.get("editorial")
+    if editorial:
+        st.write(editorial)
     else:
-        st.info("No best article chosen for this sub-topic.")
-
+        st.info("Editorial not available for this sub-topic.")
     st.markdown("---")
-    st.markdown("#### Candidates")
-    for c in cands:
-        with st.container(border=True):
-            st.markdown(f"**{c.get('title','(title)')}**  \n"
-                        f"[Open Link]({c.get('url','')})  \n"
-                        f"*{c.get('source','?')}*  |  {c.get('published_date','')}")
-
-    st.markdown("---")
-    st.markdown("#### Editorial Candidate")
-    if eds:
-        e = eds[0]
-        with st.container(border=True):
-            st.markdown(f"**{e.get('title','(title)')}**  \n"
-                        f"[Open Link]({e.get('url','')})  \n"
-                        f"*{e.get('source','?')}*  |  {e.get('published_date','')}")
+    st.markdown("#### News Articles (5)")
+    arts = ps.get("articles", [])
+    if arts:
+        for a in arts:
+            with st.container(border=True):
+                card_article(a)
     else:
-        st.info("No editorial candidate for this sub-topic.")
+        st.info("No articles found for this sub-topic.")
 
-# Run the pipeline
-if run_clicked:
-    with st.spinner("Running Crew Agents..."):
-        crew = NewsPortalCrew()
-        results = crew.run_pipeline(topic)
-        st.session_state["results"] = results
-        st.session_state["active_menu"] = "Home"
+# ---- Runner callback (ensures state is set and UI refreshes) ----
+def run_agents():
+    st.session_state["running"] = True
+    st.session_state["error"] = None
+    try:
+        with st.spinner("Running agents for Cancer Health Care..."):
+            crew = NewsPortalCrew()
+            results = crew.run_pipeline()  # topic is fixed inside crew
+            st.session_state["results"] = results
+            st.session_state["active_menu"] = "Home"
+    except Exception as e:
+        st.session_state["error"] = f"{e}\n\n{traceback.format_exc()}"
+        st.session_state["results"] = None
+    finally:
+        st.session_state["running"] = False
+        # Force a fresh render so the results show immediately
+        st.rerun()
 
-# If we have results, render the two-pane layout
-results = st.session_state.get("results")
-if results:
-    final = results.get("final", {})
-    subtopics = final.get("subtopics", [])
+# ---- Toolbar ----
+cols = st.columns([1, 1, 6])
+with cols[0]:
+    st.button("Run Agents", type="primary", disabled=st.session_state["running"], on_click=run_agents)
+with cols[1]:
+    debug = st.toggle("Debug", value=False)
+
+# ---- Layout ----
+left, right = st.columns([1, 3])
+
+# ---- Error surface ----
+if st.session_state["error"]:
+    st.error(st.session_state["error"])
+
+# ---- Render results ----
+results = st.session_state["results"]
+if not results:
+    with right:
+        st.info("Click **Run Agents** to populate the portal.")
+else:
+    # Show debug if needed
+    if debug:
+        with right:
+            st.write("### Debug: Raw results")
+            st.json(results)
+
+    final = results.get("final")
+    # Be lenient: if "final" missing, show the last step’s JSON so you can see what came back
+    if not final:
+        # Try QA output, then chief-editor, then last step
+        final = (results.get("step_12", {}) or {}).get("final") \
+             or (results.get("step_11", {}) or {}).get("final")
 
     with left:
         st.markdown("### Sections")
-        if st.button("Home", use_container_width=True):
+        if st.button("Home", use_container_width=True, disabled=st.session_state["running"]):
             st.session_state["active_menu"] = "Home"
-        # Show exactly 2 subtopics as buttons
-        for stp in subtopics[:2]:
-            if st.button(stp, use_container_width=True):
+        for stp in SUBTOPICS:
+            if st.button(stp, use_container_width=True, disabled=st.session_state["running"]):
                 st.session_state["active_menu"] = stp
-
-        st.caption("Results are saved to ./output as JSON.")
+        st.caption("Results saved under ./output")
 
     with right:
         active = st.session_state.get("active_menu", "Home")
-        if active == "Home":
-            render_home(final)
+        if not final:
+            st.warning("No `final` object found. Showing last available step:")
+            last_key = max([k for k in results.keys() if k.startswith("step_")], default=None)
+            if last_key:
+                st.json(results[last_key])
+            else:
+                st.json(results)
         else:
-            render_subtopic(final, active)
-else:
-    with right:
-        st.info("Pick a topic and click **Run Agents** to populate the portal.")
+            if active == "Home":
+                render_home(final)
+            else:
+                render_subtopic(final, active)
